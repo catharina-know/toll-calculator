@@ -15,6 +15,9 @@ public class TollCalculator
 
         Array.Sort(dates);
 
+        if (dates[0].Year < 2013)
+            throw new ArgumentException("Congestion tax was not applicable before 2013.", nameof(dates));
+
         if (dates[dates.Length - 1].Date != dates[0].Date)
             throw new ArgumentException("All dates must belong to the same day.", nameof(dates));
 
