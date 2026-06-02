@@ -2,35 +2,48 @@
 using Nager.Date;
 using TollFeeCalculator;
 
+/// <summary>
+/// Calculates the daily congestion tax for a vehicle.
+/// </summary>
+/// <remarks>
+/// All <see cref="DateTime"/> values are interpreted as Swedish local time
+/// (Europe/Stockholm), since the congestion tax is defined in local time.
+/// The caller is responsible for converting any UTC or other time-zone values
+/// before passing them in.
+/// </remarks>
 public class TollCalculator
 {
+    private const int MaxDailyFee = 60;
+    private const int ChargeWindowMinutes = 60;
+
     /// <summary>
     /// Calculate the total toll fee for one day.
     /// Dates must all belong to the same day. Unsorted input is handled internally.
     /// </summary>
-    public int GetTollFee(Vehicle vehicle, DateTime[] dates)
+    public int GetTollFee(IVehicle vehicle, DateTime[] dates)
     {
         if (vehicle == null) throw new ArgumentNullException(nameof(vehicle));
         if (dates == null || dates.Length == 0) return 0;
 
-        Array.Sort(dates);
+        DateTime[] sorted = (DateTime[])dates.Clone();
+        Array.Sort(sorted);
 
-        if (dates[0].Year < 2013)
+        if (sorted[0].Year < 2013)
             throw new ArgumentException("Congestion tax was not applicable before 2013.", nameof(dates));
 
-        if (dates[dates.Length - 1].Date != dates[0].Date)
+        if (sorted[sorted.Length - 1].Date != sorted[0].Date)
             throw new ArgumentException("All dates must belong to the same day.", nameof(dates));
 
-        DateTime intervalStart = dates[0];
+        DateTime intervalStart = sorted[0];
         int intervalMaxFee = 0;
         int totalFee = 0;
 
-        foreach (DateTime date in dates)
+        foreach (DateTime date in sorted)
         {
             int fee = GetFeeAtTime(date, vehicle);
             double minutes = (date - intervalStart).TotalMinutes;
 
-            if (minutes <= 60)
+            if (minutes <= ChargeWindowMinutes)
             {
                 if (fee > intervalMaxFee) intervalMaxFee = fee;
             }
@@ -43,15 +56,15 @@ public class TollCalculator
         }
 
         totalFee += intervalMaxFee;
-        return Math.Min(totalFee, 60);
+        return Math.Min(totalFee, MaxDailyFee);
     }
 
-    private bool IsTollFreeVehicle(Vehicle vehicle)
+    private bool IsTollFreeVehicle(IVehicle vehicle)
     {
-        return vehicle?.IsTollFree ?? false;
+        return vehicle.IsTollFree;
     }
 
-    private int GetFeeAtTime(DateTime date, Vehicle vehicle)
+    private int GetFeeAtTime(DateTime date, IVehicle vehicle)
     {
         if (IsTollFreeDate(date) || IsTollFreeVehicle(vehicle)) return 0;
 
