@@ -27,7 +27,7 @@ public class TollCalculator
 
         foreach (DateTime date in dates)
         {
-            int fee = GetTollFee(date, vehicle);
+            int fee = GetFeeAtTime(date, vehicle);
             double minutes = (date - intervalStart).TotalMinutes;
 
             if (minutes <= 60)
@@ -51,7 +51,7 @@ public class TollCalculator
         return vehicle?.IsTollFree ?? false;
     }
 
-    public int GetTollFee(DateTime date, Vehicle vehicle)
+    private int GetFeeAtTime(DateTime date, Vehicle vehicle)
     {
         if (IsTollFreeDate(date) || IsTollFreeVehicle(vehicle)) return 0;
 
