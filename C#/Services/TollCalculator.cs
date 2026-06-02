@@ -1,6 +1,7 @@
 ﻿using System;
-using Nager.Date;
-using TollFeeCalculator;
+using TollFeeCalculator.Models;
+
+namespace TollFeeCalculator.Services;
 
 /// <summary>
 /// Calculates the daily congestion tax for a vehicle.
@@ -25,6 +26,9 @@ public class TollCalculator
         if (vehicle == null) throw new ArgumentNullException(nameof(vehicle));
         if (dates == null || dates.Length == 0) return 0;
 
+        // A toll-free vehicle is never charged, so skip all per-passage work.
+        if (IsTollFreeVehicle(vehicle)) return 0;
+
         DateTime[] sorted = (DateTime[])dates.Clone();
         Array.Sort(sorted);
 
@@ -40,7 +44,7 @@ public class TollCalculator
 
         foreach (DateTime date in sorted)
         {
-            int fee = GetFeeAtTime(date, vehicle);
+            int fee = GetFeeAtTime(date);
             double minutes = (date - intervalStart).TotalMinutes;
 
             if (minutes <= ChargeWindowMinutes)
@@ -64,9 +68,9 @@ public class TollCalculator
         return vehicle.IsTollFree;
     }
 
-    private int GetFeeAtTime(DateTime date, IVehicle vehicle)
+    private int GetFeeAtTime(DateTime date)
     {
-        if (IsTollFreeDate(date) || IsTollFreeVehicle(vehicle)) return 0;
+        if (IsTollFreeDate(date)) return 0;
 
         int hour = date.Hour;
         int minute = date.Minute;
@@ -91,10 +95,64 @@ public class TollCalculator
         if (date.Month == 7)
             return true;
 
-        // Day before a public holiday is also toll-free
-        return DateSystem.IsPublicHoliday(date, CountryCode.SE) ||
-               DateSystem.IsPublicHoliday(date.AddDays(1), CountryCode.SE);
+        // A public holiday, or the day before one, is toll-free.
+        return IsPublicHoliday(date) || IsPublicHoliday(date.AddDays(1));
     }
 
+    /// <summary>Swedish public holidays ("röda dagar") relevant to the congestion tax.</summary>
+    private static bool IsPublicHoliday(DateTime date)
+    {
+        int month = date.Month;
+        int day = date.Day;
 
+        // Fixed-date holidays.
+        if ((month == 1 && day == 1) ||    // Nyårsdagen
+            (month == 1 && day == 6) ||    // Trettondedag jul
+            (month == 5 && day == 1) ||    // Första maj
+            (month == 6 && day == 6) ||    // Nationaldagen
+            (month == 12 && day == 25) ||  // Juldagen
+            (month == 12 && day == 26))    // Annandag jul
+            return true;
+
+        // Easter-based movable holidays.
+        DateTime easter = EasterSunday(date.Year);
+        DateTime d = date.Date;
+        if (d == easter.AddDays(-2) ||  // Långfredag
+            d == easter ||              // Påskdagen
+            d == easter.AddDays(1) ||   // Annandag påsk
+            d == easter.AddDays(39) ||  // Kristi himmelsfärds dag
+            d == easter.AddDays(49))    // Pingstdagen
+            return true;
+
+        // Midsommardagen: the Saturday that falls 20–26 June.
+        if (month == 6 && day >= 20 && day <= 26 && date.DayOfWeek == DayOfWeek.Saturday)
+            return true;
+
+        // Alla helgons dag: the Saturday that falls 31 Oct – 6 Nov.
+        if (((month == 10 && day == 31) || (month == 11 && day <= 6)) &&
+            date.DayOfWeek == DayOfWeek.Saturday)
+            return true;
+
+        return false;
+    }
+
+    /// <summary>Gregorian Easter Sunday (Anonymous Gregorian / Meeus–Jones–Butcher algorithm).</summary>
+    private static DateTime EasterSunday(int year)
+    {
+        int a = year % 19;
+        int b = year / 100;
+        int c = year % 100;
+        int dd = b / 4;
+        int e = b % 4;
+        int f = (b + 8) / 25;
+        int g = (b - f + 1) / 3;
+        int h = (19 * a + b - dd - g + 15) % 30;
+        int i = c / 4;
+        int k = c % 4;
+        int l = (32 + 2 * e + 2 * i - h - k) % 7;
+        int m = (a + 11 * h + 22 * l) / 451;
+        int month = (h + l - 7 * m + 114) / 31;
+        int day = ((h + l - 7 * m + 114) % 31) + 1;
+        return new DateTime(year, month, day);
+    }
 }

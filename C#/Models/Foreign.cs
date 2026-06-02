@@ -1,4 +1,4 @@
-namespace TollFeeCalculator
+namespace TollFeeCalculator.Models
 {
     public class Foreign : IVehicle
     {

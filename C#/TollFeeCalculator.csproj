@@ -6,8 +6,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Nager.Date" Version="3.*" />
-  </ItemGroup>
-
 </Project>
